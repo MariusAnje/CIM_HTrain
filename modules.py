@@ -73,7 +73,7 @@ class NModule(nn.Module):
         self.noise = torch.zeros_like(self.op.weight)
     
     def clear_mask(self):
-        self.noise = torch.ones_like(self.op.weight)
+        self.mask = torch.ones_like(self.op.weight)
 
     def normalize(self):
         if self.original_w is None:
