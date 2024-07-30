@@ -143,6 +143,62 @@ class CrossConv2d(NModule):
         if self.op.bias is not None:
             x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
         return x
+
+class LoCrossLinear(CrossLinear):
+    def __init__(self, in_features, out_features, bias=True, N_weight=4, N_ADC=4, array_size=32, mapping=None, rank = 1) -> None:
+        super().__init__(in_features, out_features, bias, N_weight, N_ADC, array_size, mapping)
+        self.rank = rank
+        if rank == 0:
+            self.A = nn.Parameter(torch.zeros_like(self.op.weight))
+            self.B = 1
+        else:
+            self.A = nn.Parameter(torch.zeros(self.op.in_features, rank))
+            self.B = nn.Parameter(torch.zeros(rank, self.op.out_features))
+    
+    def forward(self, x):
+        if self.rank == 0:
+            W_hat = self.op.weight + self.A
+        else:
+            W = self.op.weight
+            delta_W = torch.matmul(self.A, self.B).view_as(W)
+            W_hat = W + delta_W
+        if self.fast:
+            x = self.q_a_train(nn.functional.linear(x, self.q_w_f(W_hat) + self.noise))
+        else:
+            x = sepMM(x, self.q_w_f(W_hat) + self.noise, self.q_a_f, self.array_size)
+        if self.op.bias is not None:
+            return x + self.op.bias
+        else:
+            return x
+
+class LoCrossConv2d(CrossConv2d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', 
+                 N_weight=4, N_ADC=4, array_size=32, mapping=None,
+                 rank = 1):
+        super().__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode, N_weight, N_ADC, array_size, mapping)
+        self.rank = rank
+        if rank == 0:
+            self.A = nn.Parameter(torch.zeros_like(self.op.weight))
+            self.B = 1
+        else:
+            self.A = nn.Parameter(torch.zeros(self.op.out_channels, rank))
+            self.B = nn.Parameter(torch.zeros(rank, self.op.in_channels * self.op.kernel_size[0] * self.op.kernel_size[1]))
+    
+    def forward(self, x):
+        if self.rank == 0:
+            W_hat = self.op.weight + self.A
+        else:
+            W = self.op.weight
+            delta_W = torch.matmul(self.A, self.B).view_as(W)
+            W_hat = W + delta_W
+        if self.fast:
+            x = self.q_a_train(nn.functional.conv2d(x, self.q_w_f(W_hat) + self.noise, padding=self.op.padding, stride=self.op.stride))
+        else:
+            x = sepConv2d(x, self.q_w_f(W_hat) + self.noise, self.q_a_f, self.array_size, padding=self.op.padding, stride=self.op.stride)
+        if self.op.bias is not None:
+            x += self.op.bias.reshape(1,-1,1,1).expand_as(x)
+        return x
+        
         
 def num_flat_features(x):
     size = x.size()[1:]  # all dimensions except the batch dimension

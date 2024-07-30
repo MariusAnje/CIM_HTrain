@@ -3,7 +3,7 @@ import torch
 from utils import str2bool
 from utils import get_dataset, get_logger, get_model, prepare_model, get_continue_dataset
 from utils import MTrain, UpRange, CEval, MEachEval, CTrain
-import Hmodels
+import Pmodels
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     # model = get_model(args)
     # model = Hmodels.CIFAR_Plain()
     # model = Hmodels.CIFAR_Res()
-    model = Hmodels.CIFAR_Seq()
+    model = Pmodels.CIFAR()
     model.make_fast()
 
     # device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -63,26 +63,26 @@ if __name__ == "__main__":
         filtered_state_dict = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
         model.load_state_dict(filtered_state_dict, strict=False)
         model.clear_noise()
+        model.pre_training()
         model_group = model, criteria, optimizer, scheduler, compute_device, trainloader, testloader
         print("Pretrained Model.")
         print(f"Fast: No mask no noise: {CEval(model_group):.4f}")
         performance = MEachEval(model_group, "Four", args.train_var, 1, 1, 0, N=1, m=1)
         print(f"Fast: No mask noise acc: {performance:.4f}")
     else:
+        model.pre_training()
         model_group = model, criteria, optimizer, scheduler, compute_device, trainloader, testloader
         MTrain(model_group, args.train_epoch, header, "Four", args.train_var, 1, 1, 0, verbose=True, N=1, m=1)
-
-    model.fix_d = False
-    D_params = []
-    for m in model.D_modules:
-        D_params.extend(m.parameters())
-    optimizer = torch.optim.Adam(D_params, lr=1e-3)
+        exit()
+    
+    model.Lo_only()
+    Lo_parameters = model.get_Lo_parameters()
+    optimizer = torch.optim.Adam(Lo_parameters, lr=1e-3)
     # optimizer = torch.optim.SGD(D_params, lr=1e-2, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [60])
-    model.continue_setup()
     model.clear_noise()
     model.clear_mask()
-    model.set_analog_noise_multiple("Four", args.train_var, 1, 1, 0, N=1, m=1)
+    model.set_noise_multiple("Four", args.train_var, 1, 1, 0, N=1, m=1)
     model_group = model, criteria, optimizer, scheduler, compute_device, continueloader, testloader
     CTrain(model_group, args.train_epoch, header, verbose=True, N=1, m=1)
 

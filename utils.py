@@ -222,7 +222,7 @@ def CTrain(model_group, epochs, header, verbose=False, **kwargs):
             torch.save(model.state_dict(), f"tmp_best_{header}.pt")
         if verbose:
             end_time = time.time()
-            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, used time: {end_time - start_time:.4f}")
+            print(f"epoch: {i:-3d}, test acc: {test_acc:.4f}, best acc: {best_acc:.4f}, loss: {running_loss / len(trainloader):.4f}, used time: {end_time - start_time:.4f}")
         scheduler.step()
 
 def str2bool(a):
