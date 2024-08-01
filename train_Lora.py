@@ -1,6 +1,6 @@
 import argparse
 import torch
-from utils import str2bool
+from utils import str2bool, fix_random_seed
 from utils import get_dataset, get_logger, get_model, prepare_model, get_continue_dataset
 from utils import MTrain, UpRange, CEval, MEachEval, CTrain
 import Pmodels
@@ -29,6 +29,8 @@ if __name__ == "__main__":
             help='weight used in saliency - substract')
     parser.add_argument('--header', action='store',type=int, default=1,
             help='use which saved state dict')
+    parser.add_argument('--seed', action='store',type=int, default=1,
+            help='random seed to use')
     parser.add_argument('--pretrained', action='store',type=str2bool, default=True,
             help='if to use pretrained model')
     parser.add_argument('--model_path', action='store', default="./pretrained",
@@ -41,6 +43,7 @@ if __name__ == "__main__":
 
     print(args)
 
+    fix_random_seed(args.seed)
     header = args.header
 
     BS = 128
@@ -66,15 +69,18 @@ if __name__ == "__main__":
         model.pre_training()
         model_group = model, criteria, optimizer, scheduler, compute_device, trainloader, testloader
         print("Pretrained Model.")
-        print(f"Fast: No mask no noise: {CEval(model_group):.4f}")
-        performance = MEachEval(model_group, "Four", args.train_var, 1, 1, 0, N=1, m=1)
-        print(f"Fast: No mask noise acc: {performance:.4f}")
+        # print(f"Fast: No mask no noise: {CEval(model_group):.4f}")
+        # performance = MEachEval(model_group, "Four", args.train_var, 1, 1, 0, N=1, m=1)
+        # print(f"Fast: No mask noise acc: {performance:.4f}")
     else:
         model.pre_training()
         model_group = model, criteria, optimizer, scheduler, compute_device, trainloader, testloader
         MTrain(model_group, args.train_epoch, header, "Four", args.train_var, 1, 1, 0, verbose=True, N=1, m=1)
         exit()
     
+    # print(model.conv2.A[:, 0,0])
+    # print(model.conv2.B[:, 0,0])
+    # print(model.conv2.op.weight[0,0,:,:])
     model.Lo_only()
     Lo_parameters = model.get_Lo_parameters()
     optimizer = torch.optim.Adam(Lo_parameters, lr=1e-3)
@@ -85,6 +91,9 @@ if __name__ == "__main__":
     model.set_noise_multiple("Four", args.train_var, 1, 1, 0, N=1, m=1)
     model_group = model, criteria, optimizer, scheduler, compute_device, continueloader, testloader
     CTrain(model_group, args.train_epoch, header, verbose=True, N=1, m=1)
+    # print(model.conv2.A[:, 0,0])
+    # print(model.conv2.B[:, 0,0])
+    # print(model.conv2.op.weight[0,0,:,:])
 
     state_dict = torch.load(f"tmp_best_{header}.pt")
     model.load_state_dict(state_dict)

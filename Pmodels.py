@@ -8,14 +8,24 @@ class PModel(NModel):
         super().__init__(model_name, device_type)
     
     def get_conv2d(self, rank, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
-        return LoCrossConv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode, 
-                           N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping,
-                           rank=rank)
+        print(rank)
+        if rank == -1:
+            return CrossConv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode, 
+                            N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping)
+        else:
+            return LoCrossConv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode, 
+                            N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping,
+                            rank=rank)
 
     def get_linear(self, rank, in_features, out_features, bias=True):
-        return LoCrossLinear(in_features, out_features, bias, 
-                           N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping,
-                           rank=rank)
+        print(rank)
+        if rank == -1:
+            return CrossLinear(in_features, out_features, bias, 
+                            N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping)
+        else:
+            return LoCrossLinear(in_features, out_features, bias, 
+                            N_weight=self.N_weight,N_ADC=self.N_ADC,array_size=self.array_size,mapping=self.mapping,
+                            rank=rank)
     
     def is_Lo_layer(self, m):
         return isinstance(m, LoCrossLinear) or isinstance(m, LoCrossConv2d)
@@ -23,14 +33,16 @@ class PModel(NModel):
     def zero_init_Lo(self):
         for m in self.modules():
             if self.is_Lo_layer(m):
-                m.A.zero_()
+                if isinstance(m.A, nn.Parameter):
+                    m.A.data = torch.randn_like(m.A) * 1e-5
                 if isinstance(m.B, nn.Parameter):
-                    m.B.zero_()
+                    m.B.data = torch.randn_like(m.B) * 1e-5
     
     def set_Lo_grad(self, option:bool):
         for m in self.modules():
             if self.is_Lo_layer(m):
-                m.A.requires_grad = option
+                if isinstance(m.A, nn.Parameter):
+                    m.A.requires_grad = option
                 if isinstance(m.B, nn.Parameter):
                     m.B.requires_grad = option
 
@@ -53,9 +65,13 @@ class PModel(NModel):
         parameter_list = []
         for m in self.modules():
             if self.is_Lo_layer(m):
-                parameter_list.append(m.A)
+                if isinstance(m.A, nn.Parameter):
+                    parameter_list.append(m.A)
                 if isinstance(m.B, nn.Parameter):
                     parameter_list.append(m.B)
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                if m.bias is not None:
+                    parameter_list.append(m.bias)
         return parameter_list
 
 class CIFAR(PModel):
@@ -64,22 +80,36 @@ class CIFAR(PModel):
         # self.N_weight=6
         # self.N_ADC=6
         # self.array_size=64
-        rank = 0
+        rank = 32
+        # [ 0, 32,  0,  0,  0,  0] 0.8631
+        # [ 0, 16,  0,  0,  0,  0] 0.8574
+        # [ 0, 16, 32,  0,  0,  0] 0.8560
+        # [ 0, 16, 32, 32,  0,  0] 0.8510
+        # [ 0, 16, 32, 32, 64,  0] 0.8475
+        # [ 0, 16, 32, 32, 64, 64] 0.8403
+        # [ 0, 16, 32, 32, 64, 64, 256,   0,   0] 0.8523 / 0.8558
+        # [ 0, 16, 32, 32, 64, 64, 256, 256,   0] 0.8498
+        # [ 0, 16, 16, 32, 64, 64, 256,   0,   0] 0.8547
+        # [ 0, 16, 16, 16, 64, 64, 256,   0,   0] 0.8481
+        # [ 0, 08, 16, 16, 64, 64, 256,   0,   0] 0.8511
+        # [ 0, 08, 16, 16, 32, 64, 256,   0,   0] 0.8477
+        # [ 0, 08, 16, 16, 32, 32, 256,   0,   0] 0.8438
+        # [ 0, 08, 16, 16, 48, 48, 256,   0,   0] 0.8486
 
         self.conv1 = self.get_conv2d(0, 3, 64, 3, padding=1)
-        self.conv2 = self.get_conv2d(rank, 64, 64, 3, padding=1)
+        self.conv2 = self.get_conv2d(8, 64, 64, 3, padding=1)
         self.pool1 = nn.MaxPool2d(2,2)
 
-        self.conv3 = self.get_conv2d(rank, 64,128,3, padding=1)
-        self.conv4 = self.get_conv2d(rank, 128,128,3, padding=1)
+        self.conv3 = self.get_conv2d(16, 64,128,3, padding=1)
+        self.conv4 = self.get_conv2d(16, 128,128,3, padding=1)
         self.pool2 = nn.MaxPool2d(2,2)
 
-        self.conv5 = self.get_conv2d(rank, 128,256,3, padding=1)
-        self.conv6 = self.get_conv2d(rank, 256,256,3, padding=1)
+        self.conv5 = self.get_conv2d(48, 128,256,3, padding=1)
+        self.conv6 = self.get_conv2d(48, 256,256,3, padding=1)
         self.pool3 = nn.MaxPool2d(2,2)
         
-        self.fc1 = self.get_linear(rank, 256 * 4 * 4, 1024)
-        self.fc2 = self.get_linear(rank, 1024, 1024)
+        self.fc1 = self.get_linear(256, 256 * 4 * 4, 1024)
+        self.fc2 = self.get_linear(0, 1024, 1024)
         self.fc3 = self.get_linear(0, 1024, 10)
         self.relu = nn.ReLU()
 

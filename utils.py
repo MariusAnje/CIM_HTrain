@@ -11,6 +11,7 @@ import logging
 from tqdm import tqdm
 import resnet
 from data import get_dataset, get_continue_dataset
+import random
 
 def get_model(args):
     if not hasattr(args, "device_type"):
@@ -232,3 +233,13 @@ def str2bool(a):
         return False
     else:
         raise NotImplementedError(f"{a}")
+
+def fix_random_seed(seed):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False

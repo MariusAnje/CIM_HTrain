@@ -152,8 +152,8 @@ class LoCrossLinear(CrossLinear):
             self.A = nn.Parameter(torch.zeros_like(self.op.weight))
             self.B = 1
         else:
-            self.A = nn.Parameter(torch.zeros(self.op.in_features, rank))
-            self.B = nn.Parameter(torch.zeros(rank, self.op.out_features))
+            self.A = nn.Parameter(torch.randn(self.op.in_features, rank) * 1e-5)
+            self.B = nn.Parameter(torch.randn(rank, self.op.out_features) * 1e-5)
     
     def forward(self, x):
         if self.rank == 0:
@@ -181,16 +181,16 @@ class LoCrossConv2d(CrossConv2d):
             self.A = nn.Parameter(torch.zeros_like(self.op.weight))
             self.B = 1
         else:
-            self.A = nn.Parameter(torch.zeros(self.op.out_channels, rank))
-            self.B = nn.Parameter(torch.zeros(rank, self.op.in_channels * self.op.kernel_size[0] * self.op.kernel_size[1]))
+            self.A = nn.Parameter(torch.randn(self.op.kernel_size[0] * self.op.kernel_size[1], rank, self.op.out_channels) * 1e-5)
+            self.B = nn.Parameter(torch.randn(self.op.kernel_size[0] * self.op.kernel_size[1], self.op.in_channels, rank ) * 1e-5)
     
     def forward(self, x):
         if self.rank == 0:
             W_hat = self.op.weight + self.A
         else:
             W = self.op.weight
-            delta_W = torch.matmul(self.A, self.B).view_as(W)
-            W_hat = W + delta_W
+            delta_W = self.B.bmm(self.A).swapaxes(0,2).view(self.op.weight.shape)
+            W_hat = self.op.weight + delta_W
         if self.fast:
             x = self.q_a_train(nn.functional.conv2d(x, self.q_w_f(W_hat) + self.noise, padding=self.op.padding, stride=self.op.stride))
         else:
