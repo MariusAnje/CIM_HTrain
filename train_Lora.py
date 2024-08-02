@@ -78,8 +78,8 @@ if __name__ == "__main__":
         MTrain(model_group, args.train_epoch, header, "Four", args.train_var, 1, 1, 0, verbose=True, N=1, m=1)
         exit()
     
-    # print(model.conv2.A[:, 0,0])
-    # print(model.conv2.B[:, 0,0])
+    # print(model.conv2.A[:, 0])
+    # print(model.conv2.B[:, 0])
     # print(model.conv2.op.weight[0,0,:,:])
     model.Lo_only()
     Lo_parameters = model.get_Lo_parameters()
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     model.set_noise_multiple("Four", args.train_var, 1, 1, 0, N=1, m=1)
     model_group = model, criteria, optimizer, scheduler, compute_device, continueloader, testloader
     CTrain(model_group, args.train_epoch, header, verbose=True, N=1, m=1)
-    # print(model.conv2.A[:, 0,0])
-    # print(model.conv2.B[:, 0,0])
+    # print(model.conv2.A[:, 0])
+    # print(model.conv2.B[:, 0])
     # print(model.conv2.op.weight[0,0,:,:])
 
     state_dict = torch.load(f"tmp_best_{header}.pt")

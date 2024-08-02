@@ -237,14 +237,14 @@ class LoCrossConv2d(CrossConv2d):
             self.B = 1
         else:
             self.A = nn.Parameter(torch.randn(self.op.out_channels, rank) * 1e-5)
-            self.B = nn.Parameter(torch.randn(rank, self.op.in_channels) * 1e-5)
+            self.B = nn.Parameter(torch.randn(rank, self.op.kernel_size[0] * self.op.kernel_size[1] * self.op.in_channels) * 1e-5)
     
     def forward(self, x):
         if self.rank == 0:
             W_hat = self.op.weight + self.A
         else:
             W = self.op.weight
-            delta_W = self.A.mm(self.B).view(self.op.out_channels, self.op.in_channels, 1, 1).expand_as(self.op.weight)
+            delta_W = self.A.mm(self.B).view(self.op.weight.shape)
             W_hat = self.op.weight + delta_W
         if self.fast:
             x = self.q_a_train(nn.functional.conv2d(x, self.q_w_f(W_hat) + self.noise, padding=self.op.padding, stride=self.op.stride))

@@ -81,6 +81,7 @@ class CIFAR(PModel):
         # self.N_ADC=6
         # self.array_size=64
         rank = 32
+        # 3 x 3 Kernel
         # [ 0, 32,  0,  0,  0,  0] 0.8631
         # [ 0, 16,  0,  0,  0,  0] 0.8574
         # [ 0, 16, 32,  0,  0,  0] 0.8560
@@ -96,16 +97,25 @@ class CIFAR(PModel):
         # [ 0, 08, 16, 16, 32, 32, 256,   0,   0] 0.8438
         # [ 0, 08, 16, 16, 48, 48, 256,   0,   0] 0.8486
 
+        # 1 x 1 Kernel
+        # [ 0, 16, 32, 32, 64, 64, 256,   0,   0] 0.8220
+        # [ 0, 08, 16, 16, 48, 48, 256,   0,   0] 0.8253
+
+        # Channel x Kernel setup
+        # [ 0, 32, 64, 64,128,128, 256,   0,   0] 0.8514
+        # [ 0, 16, 32, 32, 64, 64, 256,   0,   0] 0.8449
+
+
         self.conv1 = self.get_conv2d(0, 3, 64, 3, padding=1)
-        self.conv2 = self.get_conv2d(8, 64, 64, 3, padding=1)
+        self.conv2 = self.get_conv2d(32, 64, 64, 3, padding=1)
         self.pool1 = nn.MaxPool2d(2,2)
 
-        self.conv3 = self.get_conv2d(16, 64,128,3, padding=1)
-        self.conv4 = self.get_conv2d(16, 128,128,3, padding=1)
+        self.conv3 = self.get_conv2d(64, 64,128,3, padding=1)
+        self.conv4 = self.get_conv2d(64, 128,128,3, padding=1)
         self.pool2 = nn.MaxPool2d(2,2)
 
-        self.conv5 = self.get_conv2d(48, 128,256,3, padding=1)
-        self.conv6 = self.get_conv2d(48, 256,256,3, padding=1)
+        self.conv5 = self.get_conv2d(128, 128,256,3, padding=1)
+        self.conv6 = self.get_conv2d(128, 256,256,3, padding=1)
         self.pool3 = nn.MaxPool2d(2,2)
         
         self.fc1 = self.get_linear(256, 256 * 4 * 4, 1024)
